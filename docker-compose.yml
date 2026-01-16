@@ -25,7 +25,7 @@ services:
             fi
           fi
           export INSTANCE_SECRET
-          exec /run_backend.sh
+          exec /convex/run_backend.sh
     volumes:
       - convex-data:/convex/data
     environment:
