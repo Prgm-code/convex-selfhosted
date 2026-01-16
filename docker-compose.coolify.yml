@@ -4,6 +4,7 @@
 # - CONVEX_CLOUD_ORIGIN (ej: https://e4ws0s0skoss4kocck8ccoks.app.reactive.lat)
 # - CONVEX_SITE_ORIGIN (ej: https://e4ws0s0skoss4kocck8ccoks.app.reactive.lat)
 # - NEXT_PUBLIC_DEPLOYMENT_URL (ej: https://e4ws0s0skoss4kocck8ccoks.app.reactive.lat)
+# - CONVEX_DATA_VOLUME (opcional: cambia el nombre para resetear la DB)
 
 services:
   backend:
@@ -67,4 +68,6 @@ services:
 
 volumes:
   convex-data:
+    # Cambia CONVEX_DATA_VOLUME en Coolify para forzar un volumen nuevo
+    name: ${CONVEX_DATA_VOLUME:-convex-data}
     driver: local
