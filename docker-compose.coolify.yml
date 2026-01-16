@@ -1,29 +1,23 @@
 # Docker Compose para Coolify - Convex Self-Hosted
-# Este archivo está optimizado para despliegue en Coolify
-# Las variables de entorno se configuran desde la UI de Coolify
+# IMPORTANTE: Configura estas variables en Coolify Environment Variables:
+# - INSTANCE_SECRET (generado con: openssl rand -hex 32)
+# - CONVEX_CLOUD_ORIGIN (ej: https://e4ws0s0skoss4kocck8ccoks.app.reactive.lat)
+# - CONVEX_SITE_ORIGIN (ej: https://e4ws0s0skoss4kocck8ccoks.app.reactive.lat)
+# - NEXT_PUBLIC_DEPLOYMENT_URL (ej: https://e4ws0s0skoss4kocck8ccoks.app.reactive.lat)
 
 services:
   backend:
     image: ghcr.io/get-convex/convex-backend:latest
-    container_name: convex-backend
     restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGINT
-    ports:
-      - "${BACKEND_PORT:-3210}:3210"
-      - "${SITE_PROXY_PORT:-3211}:3211"
     volumes:
       - convex-data:/convex/data
     environment:
-      # === CONFIGURACIÓN BÁSICA (REQUERIDAS) ===
       - INSTANCE_NAME=${INSTANCE_NAME:-convex-instance}
-      - INSTANCE_SECRET=${INSTANCE_SECRET:?INSTANCE_SECRET es requerido}
-      
-      # === URLs (Configurar con tu dominio en Coolify) ===
+      - INSTANCE_SECRET=${INSTANCE_SECRET}
       - CONVEX_CLOUD_ORIGIN=${CONVEX_CLOUD_ORIGIN:-http://localhost:3210}
       - CONVEX_SITE_ORIGIN=${CONVEX_SITE_ORIGIN:-http://localhost:3211}
-      
-      # === CONFIGURACIÓN DE COMPORTAMIENTO ===
       - RUST_LOG=${RUST_LOG:-info}
       - RUST_BACKTRACE=${RUST_BACKTRACE:-0}
       - DO_NOT_REQUIRE_SSL=${DO_NOT_REQUIRE_SSL:-true}
@@ -32,13 +26,9 @@ services:
       - ACTIONS_USER_TIMEOUT_SECS=${ACTIONS_USER_TIMEOUT_SECS:-300}
       - HTTP_SERVER_TIMEOUT_SECONDS=${HTTP_SERVER_TIMEOUT_SECONDS:-300}
       - REDACT_LOGS_TO_CLIENT=${REDACT_LOGS_TO_CLIENT:-false}
-      
-      # === BASE DE DATOS (Opcional - elegir una) ===
       - DATABASE_URL=${DATABASE_URL:-}
       - POSTGRES_URL=${POSTGRES_URL:-}
       - MYSQL_URL=${MYSQL_URL:-}
-      
-      # === S3 STORAGE (Opcional) ===
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
@@ -52,69 +42,29 @@ services:
       - AWS_S3_DISABLE_CHECKSUMS=${AWS_S3_DISABLE_CHECKSUMS:-}
       - AWS_S3_DISABLE_SSE=${AWS_S3_DISABLE_SSE:-}
       - AWS_S3_FORCE_PATH_STYLE=${AWS_S3_FORCE_PATH_STYLE:-}
-      
-      # === AVANZADO ===
       - CONVEX_RELEASE_VERSION_DEV=${CONVEX_RELEASE_VERSION_DEV:-}
-
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3210/version"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    
+      test: ["CMD-SHELL", "curl -sf http://localhost:3210/version || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
     labels:
       - "coolify.managed=true"
-      # === Traefik Labels para Backend API (puerto 3210) ===
-      - "traefik.enable=true"
-      # Router para el backend principal
-      - "traefik.http.routers.convex-backend.rule=Host(`${BACKEND_DOMAIN:-convex-api.localhost}`)"
-      - "traefik.http.routers.convex-backend.entrypoints=https"
-      - "traefik.http.routers.convex-backend.tls=true"
-      - "traefik.http.routers.convex-backend.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.convex-backend.service=convex-backend"
-      - "traefik.http.services.convex-backend.loadbalancer.server.port=3210"
-      # Router para el site proxy (puerto 3211)
-      - "traefik.http.routers.convex-site.rule=Host(`${SITE_DOMAIN:-convex-site.localhost}`)"
-      - "traefik.http.routers.convex-site.entrypoints=https"
-      - "traefik.http.routers.convex-site.tls=true"
-      - "traefik.http.routers.convex-site.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.convex-site.service=convex-site"
-      - "traefik.http.services.convex-site.loadbalancer.server.port=3211"
 
   dashboard:
     image: ghcr.io/get-convex/convex-dashboard:latest
-    container_name: convex-dashboard
     restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGINT
-    ports:
-      - "${DASHBOARD_PORT:-6791}:6791"
     environment:
-      # URL del backend (debe ser accesible desde el navegador del usuario)
       - NEXT_PUBLIC_DEPLOYMENT_URL=${NEXT_PUBLIC_DEPLOYMENT_URL:-http://localhost:3210}
       - NEXT_PUBLIC_LOAD_MONACO_INTERNALLY=${NEXT_PUBLIC_LOAD_MONACO_INTERNALLY:-true}
-    depends_on:
-      backend:
-        condition: service_healthy
-    
+    # Removido depends_on para evitar fallo por healthcheck
+    # El dashboard intentará conectarse al backend cuando esté listo
     labels:
       - "coolify.managed=true"
-      # === Traefik Labels para Dashboard (puerto 6791) ===
-      - "traefik.enable=true"
-      - "traefik.http.routers.convex-dashboard.rule=Host(`${DASHBOARD_DOMAIN:-convex-dashboard.localhost}`)"
-      - "traefik.http.routers.convex-dashboard.entrypoints=https"
-      - "traefik.http.routers.convex-dashboard.tls=true"
-      - "traefik.http.routers.convex-dashboard.tls.certresolver=letsencrypt"
-      - "traefik.http.services.convex-dashboard.loadbalancer.server.port=6791"
 
 volumes:
   convex-data:
     driver: local
-
-networks:
-  default:
-    name: convex-network
-  # Red de Coolify/Traefik - necesaria para que Traefik pueda enrutar
-  coolify:
-    external: true
