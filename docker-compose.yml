@@ -1,63 +1,87 @@
+# Docker Compose para Coolify - Convex Self-Hosted
+# IMPORTANTE: Configura estas variables en Coolify Environment Variables:
+# - INSTANCE_SECRET (generado con: openssl rand -hex 32)
+# - CONVEX_CLOUD_ORIGIN (ej: https://e4ws0s0skoss4kocck8ccoks.app.reactive.lat)
+# - CONVEX_SITE_ORIGIN (ej: https://e4ws0s0skoss4kocck8ccoks.app.reactive.lat)
+# - NEXT_PUBLIC_DEPLOYMENT_URL (ej: https://e4ws0s0skoss4kocck8ccoks.app.reactive.lat)
+# - CONVEX_DATA_VOLUME (opcional: cambia el nombre para resetear la DB)
+
 services:
   backend:
-    # Change this to :${REV} if you want to pin to a specific version
     image: ghcr.io/get-convex/convex-backend:latest
+    restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGINT
-    ports:
-      - "${PORT:-3210}:3210"
-      - "${SITE_PROXY_PORT:-3211}:3211"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+          if [ -z "$INSTANCE_SECRET" ]; then
+            if [ -f /convex/data/instance_secret ]; then
+              INSTANCE_SECRET="$(cat /convex/data/instance_secret)"
+            else
+              INSTANCE_SECRET="$(tr -dc 'a-f0-9' </dev/urandom | head -c 64)"
+              echo "$INSTANCE_SECRET" > /convex/data/instance_secret
+            fi
+          fi
+          export INSTANCE_SECRET
+          exec /run_backend.sh
     volumes:
-      - data:/convex/data
+      - convex-data:/convex/data
     environment:
-      - ACTIONS_USER_TIMEOUT_SECS
-      - AWS_ACCESS_KEY_ID
-      - AWS_REGION
-      - AWS_S3_DISABLE_CHECKSUMS
-      - AWS_S3_DISABLE_SSE
-      - AWS_S3_FORCE_PATH_STYLE
-      - AWS_SECRET_ACCESS_KEY
-      - AWS_SESSION_TOKEN
-      - CONVEX_CLOUD_ORIGIN=${CONVEX_CLOUD_ORIGIN:-http://127.0.0.1:${PORT:-3210}}
-      - CONVEX_RELEASE_VERSION_DEV
-      - CONVEX_SITE_ORIGIN=${CONVEX_SITE_ORIGIN:-http://127.0.0.1:${SITE_PROXY_PORT:-3211}}
-      - DATABASE_URL
-      - DISABLE_BEACON
-      - DOCUMENT_RETENTION_DELAY=${DOCUMENT_RETENTION_DELAY:-172800} # Lower default document retention to 2 days
-      - DO_NOT_REQUIRE_SSL
-      - HTTP_SERVER_TIMEOUT_SECONDS
-      - INSTANCE_NAME
-      - INSTANCE_SECRET
-      - MYSQL_URL
-      - POSTGRES_URL
-      - REDACT_LOGS_TO_CLIENT
-      - RUST_BACKTRACE
+      - INSTANCE_NAME=${INSTANCE_NAME:-convex-instance}
+      - INSTANCE_SECRET=${INSTANCE_SECRET}
+      - CONVEX_CLOUD_ORIGIN=${CONVEX_CLOUD_ORIGIN:-http://localhost:3210}
+      - CONVEX_SITE_ORIGIN=${CONVEX_SITE_ORIGIN:-http://localhost:3211}
       - RUST_LOG=${RUST_LOG:-info}
-      - S3_ENDPOINT_URL
-      - S3_STORAGE_EXPORTS_BUCKET
-      - S3_STORAGE_FILES_BUCKET
-      - S3_STORAGE_MODULES_BUCKET
-      - S3_STORAGE_SEARCH_BUCKET
-      - S3_STORAGE_SNAPSHOT_IMPORTS_BUCKET
-
+      - RUST_BACKTRACE=${RUST_BACKTRACE:-0}
+      - DO_NOT_REQUIRE_SSL=${DO_NOT_REQUIRE_SSL:-true}
+      - DISABLE_BEACON=${DISABLE_BEACON:-true}
+      - DOCUMENT_RETENTION_DELAY=${DOCUMENT_RETENTION_DELAY:-172800}
+      - ACTIONS_USER_TIMEOUT_SECS=${ACTIONS_USER_TIMEOUT_SECS:-300}
+      - HTTP_SERVER_TIMEOUT_SECONDS=${HTTP_SERVER_TIMEOUT_SECONDS:-300}
+      - REDACT_LOGS_TO_CLIENT=${REDACT_LOGS_TO_CLIENT:-false}
+      - DATABASE_URL=${DATABASE_URL:-}
+      - POSTGRES_URL=${POSTGRES_URL:-}
+      - MYSQL_URL=${MYSQL_URL:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
+      - AWS_REGION=${AWS_REGION:-}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
+      - S3_STORAGE_FILES_BUCKET=${S3_STORAGE_FILES_BUCKET:-}
+      - S3_STORAGE_MODULES_BUCKET=${S3_STORAGE_MODULES_BUCKET:-}
+      - S3_STORAGE_SEARCH_BUCKET=${S3_STORAGE_SEARCH_BUCKET:-}
+      - S3_STORAGE_EXPORTS_BUCKET=${S3_STORAGE_EXPORTS_BUCKET:-}
+      - S3_STORAGE_SNAPSHOT_IMPORTS_BUCKET=${S3_STORAGE_SNAPSHOT_IMPORTS_BUCKET:-}
+      - AWS_S3_DISABLE_CHECKSUMS=${AWS_S3_DISABLE_CHECKSUMS:-}
+      - AWS_S3_DISABLE_SSE=${AWS_S3_DISABLE_SSE:-}
+      - AWS_S3_FORCE_PATH_STYLE=${AWS_S3_FORCE_PATH_STYLE:-}
+      - CONVEX_RELEASE_VERSION_DEV=${CONVEX_RELEASE_VERSION_DEV:-}
     healthcheck:
-      test: curl -f http://localhost:3210/version
-      interval: 5s
-      start_period: 10s
+      test: ["CMD-SHELL", "curl -sf http://localhost:3210/version || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+    labels:
+      - "coolify.managed=true"
 
   dashboard:
-    # Change this to :${REV} if you want to pin to a specific version
     image: ghcr.io/get-convex/convex-dashboard:latest
+    restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGINT
-    ports:
-      - "${DASHBOARD_PORT:-6791}:6791"
     environment:
-      - NEXT_PUBLIC_DEPLOYMENT_URL=${NEXT_PUBLIC_DEPLOYMENT_URL:-http://127.0.0.1:${PORT:-3210}}
-      - NEXT_PUBLIC_LOAD_MONACO_INTERNALLY
-    depends_on:
-      backend:
-        condition: service_healthy
+      - NEXT_PUBLIC_DEPLOYMENT_URL=${NEXT_PUBLIC_DEPLOYMENT_URL:-http://localhost:3210}
+      - NEXT_PUBLIC_LOAD_MONACO_INTERNALLY=${NEXT_PUBLIC_LOAD_MONACO_INTERNALLY:-false}
+    # Removido depends_on para evitar fallo por healthcheck
+    # El dashboard intentará conectarse al backend cuando esté listo
+    labels:
+      - "coolify.managed=true"
 
 volumes:
-  data:
+  convex-data:
+    # Cambia CONVEX_DATA_VOLUME en Coolify para forzar un volumen nuevo
+    name: ${CONVEX_DATA_VOLUME:-convex-data}
+    driver: local
