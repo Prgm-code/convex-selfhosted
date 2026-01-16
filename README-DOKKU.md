@@ -198,3 +198,6 @@ ssh dokku@tu-servidor "sudo tar -xzf /tmp/convex-backup.tar.gz -C /"
 dokku config:set convex-backend < convex-config-backup.txt
 ```
 
+
+
+
