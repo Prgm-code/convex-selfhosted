@@ -1,9 +1,6 @@
-# Docker Compose para Coolify - Convex Self-Hosted
-# IMPORTANTE: Configura estas variables en Coolify Environment Variables:
-# - CONVEX_CLOUD_ORIGIN (ej: https://e4ws0s0skoss4kocck8ccoks.app.reactive.lat)
-# - CONVEX_SITE_ORIGIN (ej: https://e4ws0s0skoss4kocck8ccoks.app.reactive.lat)
-# - NEXT_PUBLIC_DEPLOYMENT_URL (ej: https://e4ws0s0skoss4kocck8ccoks.app.reactive.lat)
-# - CONVEX_DATA_VOLUME (opcional: cambia el nombre para resetear la DB)
+# Coolify con exposición opcional de puertos locales
+# Por defecto no expone puertos en la máquina host.
+# Para exponer, define los puertos en variables de entorno.
 
 services:
   backend:
@@ -11,6 +8,11 @@ services:
     restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGINT
+    # Exposición opcional de puertos en host
+    # Si BACKEND_HOST_PORT o SITE_PROXY_HOST_PORT están vacíos, no se publica.
+    ports:
+      - "${BACKEND_HOST_PORT:-}:3210"
+      - "${SITE_PROXY_HOST_PORT:-}:3211"
     volumes:
       - convex-data:/convex/data
     environment:
@@ -56,16 +58,16 @@ services:
     restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGINT
+    # Exposición opcional de puerto en host
+    ports:
+      - "${DASHBOARD_HOST_PORT:-}:6791"
     environment:
       - NEXT_PUBLIC_DEPLOYMENT_URL=${NEXT_PUBLIC_DEPLOYMENT_URL:-http://localhost:3210}
       - NEXT_PUBLIC_LOAD_MONACO_INTERNALLY=${NEXT_PUBLIC_LOAD_MONACO_INTERNALLY:-false}
-    # Removido depends_on para evitar fallo por healthcheck
-    # El dashboard intentará conectarse al backend cuando esté listo
     labels:
       - "coolify.managed=true"
 
 volumes:
   convex-data:
-    # Cambia CONVEX_DATA_VOLUME en Coolify para forzar un volumen nuevo
     name: ${CONVEX_DATA_VOLUME:-convex-data}
     driver: local
