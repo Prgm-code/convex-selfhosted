@@ -65,6 +65,22 @@ services:
     
     labels:
       - "coolify.managed=true"
+      # === Traefik Labels para Backend API (puerto 3210) ===
+      - "traefik.enable=true"
+      # Router para el backend principal
+      - "traefik.http.routers.convex-backend.rule=Host(`${BACKEND_DOMAIN:-convex-api.localhost}`)"
+      - "traefik.http.routers.convex-backend.entrypoints=https"
+      - "traefik.http.routers.convex-backend.tls=true"
+      - "traefik.http.routers.convex-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.convex-backend.service=convex-backend"
+      - "traefik.http.services.convex-backend.loadbalancer.server.port=3210"
+      # Router para el site proxy (puerto 3211)
+      - "traefik.http.routers.convex-site.rule=Host(`${SITE_DOMAIN:-convex-site.localhost}`)"
+      - "traefik.http.routers.convex-site.entrypoints=https"
+      - "traefik.http.routers.convex-site.tls=true"
+      - "traefik.http.routers.convex-site.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.convex-site.service=convex-site"
+      - "traefik.http.services.convex-site.loadbalancer.server.port=3211"
 
   dashboard:
     image: ghcr.io/get-convex/convex-dashboard:latest
@@ -84,6 +100,13 @@ services:
     
     labels:
       - "coolify.managed=true"
+      # === Traefik Labels para Dashboard (puerto 6791) ===
+      - "traefik.enable=true"
+      - "traefik.http.routers.convex-dashboard.rule=Host(`${DASHBOARD_DOMAIN:-convex-dashboard.localhost}`)"
+      - "traefik.http.routers.convex-dashboard.entrypoints=https"
+      - "traefik.http.routers.convex-dashboard.tls=true"
+      - "traefik.http.routers.convex-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.services.convex-dashboard.loadbalancer.server.port=6791"
 
 volumes:
   convex-data:
@@ -92,3 +115,6 @@ volumes:
 networks:
   default:
     name: convex-network
+  # Red de Coolify/Traefik - necesaria para que Traefik pueda enrutar
+  coolify:
+    external: true
