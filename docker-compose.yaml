@@ -1,6 +1,5 @@
 # Docker Compose para Coolify - Convex Self-Hosted
 # IMPORTANTE: Configura estas variables en Coolify Environment Variables:
-# - INSTANCE_SECRET (generado con: openssl rand -hex 32)
 # - CONVEX_CLOUD_ORIGIN (ej: https://e4ws0s0skoss4kocck8ccoks.app.reactive.lat)
 # - CONVEX_SITE_ORIGIN (ej: https://e4ws0s0skoss4kocck8ccoks.app.reactive.lat)
 # - NEXT_PUBLIC_DEPLOYMENT_URL (ej: https://e4ws0s0skoss4kocck8ccoks.app.reactive.lat)
@@ -12,25 +11,10 @@ services:
     restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGINT
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-          if [ -z "$INSTANCE_SECRET" ]; then
-            if [ -f /convex/data/instance_secret ]; then
-              INSTANCE_SECRET="$(cat /convex/data/instance_secret)"
-            else
-              INSTANCE_SECRET="$(tr -dc 'a-f0-9' </dev/urandom | head -c 64)"
-              echo "$INSTANCE_SECRET" > /convex/data/instance_secret
-            fi
-          fi
-          export INSTANCE_SECRET
-          exec /convex/run_backend.sh
     volumes:
       - convex-data:/convex/data
     environment:
       - INSTANCE_NAME=${INSTANCE_NAME:-convex-instance}
-      - INSTANCE_SECRET=${INSTANCE_SECRET}
       - CONVEX_CLOUD_ORIGIN=${CONVEX_CLOUD_ORIGIN:-http://localhost:3210}
       - CONVEX_SITE_ORIGIN=${CONVEX_SITE_ORIGIN:-http://localhost:3211}
       - RUST_LOG=${RUST_LOG:-info}
