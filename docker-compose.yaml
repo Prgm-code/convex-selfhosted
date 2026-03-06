@@ -4,7 +4,7 @@
 
 services:
   backend:
-    image: ghcr.io/get-convex/convex-backend:8c5259df460c7176cc891f404ba4e56df199f1c7
+    image: ghcr.io/get-convex/convex-backend:latest
     restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGINT
