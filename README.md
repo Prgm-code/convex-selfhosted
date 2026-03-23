@@ -25,6 +25,10 @@ Este repositorio contiene dos modos de despliegue:
 3. Configura estas variables en **Environment Variables**:
 
 ```
+BACKEND_HOST_PORT=3210
+SITE_PROXY_HOST_PORT=3211
+DASHBOARD_HOST_PORT=6791
+
 CONVEX_CLOUD_ORIGIN=https://tu-dominio-backend
 CONVEX_SITE_ORIGIN=https://tu-dominio-site
 NEXT_PUBLIC_DEPLOYMENT_URL=https://tu-dominio-backend

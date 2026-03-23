@@ -22,10 +22,10 @@ Esta guía te ayudará a desplegar Convex Self-Hosted en Coolify usando Docker C
 **Opción A: Desde GitHub**
 - URL del repositorio: `https://github.com/tu-usuario/convex-selfhosted`
 - Branch: `main`
-- Compose file: `docker-compose.coolify.yml`
+- Compose file: `docker-compose.yaml`
 
 **Opción B: Compose Manual**
-- Copia el contenido de `docker-compose.coolify.yml` directamente en Coolify
+- Copia el contenido de `docker-compose.yaml` directamente en Coolify
 
 ### 3. Configurar Variables de Entorno
 
