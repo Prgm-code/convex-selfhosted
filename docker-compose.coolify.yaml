@@ -1,7 +1,6 @@
-# Docker Compose específico para Coolify.
-# El backend publica dos URLs desde el mismo contenedor:
-# - 3210: backend/API
-# - 3211: site proxy/actions
+# Docker Compose genérico para Coolify - self-hosted Convex
+# Configura CONVEX_CLOUD_ORIGIN y CONVEX_SITE_ORIGIN en las variables
+# de entorno de Coolify antes de desplegar.
 
 services:
   backend:
@@ -12,16 +11,15 @@ services:
     volumes:
       - convex-data:/convex/data
     environment:
-      - SERVICE_URL_BACKEND_3210
-      - SERVICE_URL_BACKEND_3211
+      # ✅ CRÍTICO: define estas dos en las env vars de Coolify con las URLs reales
+      - CONVEX_CLOUD_ORIGIN=${CONVEX_CLOUD_ORIGIN}
+      - CONVEX_SITE_ORIGIN=${CONVEX_SITE_ORIGIN}
+      - INSTANCE_NAME=${INSTANCE_NAME:-convex-instance}
+      - INSTANCE_SECRET=${INSTANCE_SECRET}
       - APPLICATION_MAX_CONCURRENT_MUTATIONS=${APPLICATION_MAX_CONCURRENT_MUTATIONS:-16}
       - APPLICATION_MAX_CONCURRENT_NODE_ACTIONS=${APPLICATION_MAX_CONCURRENT_NODE_ACTIONS:-16}
       - APPLICATION_MAX_CONCURRENT_QUERIES=${APPLICATION_MAX_CONCURRENT_QUERIES:-16}
       - APPLICATION_MAX_CONCURRENT_V8_ACTIONS=${APPLICATION_MAX_CONCURRENT_V8_ACTIONS:-16}
-      - INSTANCE_NAME=${INSTANCE_NAME:-convex-instance}
-      - INSTANCE_SECRET=${SERVICE_HEX_32_SECRET}
-      - CONVEX_CLOUD_ORIGIN=${SERVICE_URL_BACKEND}
-      - CONVEX_SITE_ORIGIN=${SERVICE_URL_BACKEND_3211}
       - RUST_LOG=${RUST_LOG:-info}
       - RUST_BACKTRACE=${RUST_BACKTRACE:-0}
       - DO_NOT_REQUIRE_SSL=${DO_NOT_REQUIRE_SSL:-true}
@@ -63,14 +61,18 @@ services:
     stop_grace_period: 10s
     stop_signal: SIGINT
     environment:
-      - SERVICE_URL_DASHBOARD_6791
-      - NEXT_PUBLIC_DEPLOYMENT_URL=${SERVICE_URL_BACKEND}
+      # ✅ Debe apuntar a la misma URL que CONVEX_CLOUD_ORIGIN
+      - NEXT_PUBLIC_DEPLOYMENT_URL=${CONVEX_CLOUD_ORIGIN}
       - NEXT_PUBLIC_LOAD_MONACO_INTERNALLY=${NEXT_PUBLIC_LOAD_MONACO_INTERNALLY:-false}
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:6791/ >/dev/null 2>&1 || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:6791/ >/dev/null 2>&1 || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 20
