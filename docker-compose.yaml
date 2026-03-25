@@ -1,7 +1,5 @@
-# docker-compose.yaml
-# Base: sin puertos publicados en el host.
-# Las variables de entorno se mantienen compatibles.
-# Si quieres exponer puertos, usa docker-compose.ports.yaml
+# Coolify con puertos publicados en el host por defecto.
+# Mantiene compatibilidad con las variables de entorno ya usadas en despliegues existentes.
 
 services:
   backend:
@@ -9,17 +7,13 @@ services:
     restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGINT
-
-    # AGREGADO:
-    # expose solo abre los puertos dentro de la red interna de Docker,
-    # pero NO los publica en el host.
-    expose:
-      - "3210"
-      - "3211"
-
+    # Publica puertos en el host por defecto para que Coolify pueda exponerlos.
+    # Puedes cambiarlos con BACKEND_HOST_PORT y SITE_PROXY_HOST_PORT.
+    ports:
+      - "${BACKEND_HOST_PORT:-3210}:3210"
+      - "${SITE_PROXY_HOST_PORT:-3211}:3211"
     volumes:
       - convex-data:/convex/data
-
     environment:
       - APPLICATION_MAX_CONCURRENT_MUTATIONS=${APPLICATION_MAX_CONCURRENT_MUTATIONS:-16}
       - APPLICATION_MAX_CONCURRENT_NODE_ACTIONS=${APPLICATION_MAX_CONCURRENT_NODE_ACTIONS:-16}
@@ -27,12 +21,8 @@ services:
       - APPLICATION_MAX_CONCURRENT_V8_ACTIONS=${APPLICATION_MAX_CONCURRENT_V8_ACTIONS:-16}
       - INSTANCE_NAME=${INSTANCE_NAME:-convex-instance}
       - INSTANCE_SECRET=${INSTANCE_SECRET:-}
-
-      # MANTENIDO:
-      # Si no defines estas variables, siguen quedando con sus defaults actuales.
       - CONVEX_CLOUD_ORIGIN=${CONVEX_CLOUD_ORIGIN:-http://127.0.0.1:${BACKEND_HOST_PORT:-3210}}
       - CONVEX_SITE_ORIGIN=${CONVEX_SITE_ORIGIN:-http://127.0.0.1:${SITE_PROXY_HOST_PORT:-3211}}
-
       - RUST_LOG=${RUST_LOG:-info}
       - RUST_BACKTRACE=${RUST_BACKTRACE:-0}
       - DO_NOT_REQUIRE_SSL=${DO_NOT_REQUIRE_SSL:-true}
@@ -59,14 +49,12 @@ services:
       - AWS_S3_DISABLE_SSE=${AWS_S3_DISABLE_SSE:-}
       - AWS_S3_FORCE_PATH_STYLE=${AWS_S3_FORCE_PATH_STYLE:-}
       - CONVEX_RELEASE_VERSION_DEV=${CONVEX_RELEASE_VERSION_DEV:-}
-
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:3210/version || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 20
       start_period: 120s
-
     labels:
       - "coolify.managed=true"
 
@@ -75,20 +63,15 @@ services:
     restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGINT
-
-    # AGREGADO:
-    # visible solo dentro de la red Docker, no en el host.
-    expose:
-      - "6791"
-
+    # Publica el dashboard en el host por defecto.
+    ports:
+      - "${DASHBOARD_HOST_PORT:-6791}:6791"
     environment:
       - NEXT_PUBLIC_DEPLOYMENT_URL=${NEXT_PUBLIC_DEPLOYMENT_URL:-http://127.0.0.1:${BACKEND_HOST_PORT:-3210}}
       - NEXT_PUBLIC_LOAD_MONACO_INTERNALLY=${NEXT_PUBLIC_LOAD_MONACO_INTERNALLY:-false}
-
     depends_on:
       backend:
         condition: service_healthy
-
     labels:
       - "coolify.managed=true"
 
