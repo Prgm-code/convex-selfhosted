@@ -11,15 +11,23 @@ services:
     volumes:
       - convex-data:/convex/data
     environment:
-      # ✅ CRÍTICO: define estas dos en las env vars de Coolify con las URLs reales
-      - CONVEX_CLOUD_ORIGIN=${CONVEX_CLOUD_ORIGIN}
-      - CONVEX_SITE_ORIGIN=${CONVEX_SITE_ORIGIN}
+      - SERVICE_URL_BACKEND_3210
+      - SERVICE_URL_SITE_3211
+
+      # Backend API / puerto 3210
+      - CONVEX_CLOUD_ORIGIN=${SERVICE_URL_BACKEND}
+
+      # HTTP actions / site / puerto 3211
+      - CONVEX_SITE_ORIGIN=${SERVICE_URL_SITE}
+
       - INSTANCE_NAME=${INSTANCE_NAME:-convex-instance}
       - INSTANCE_SECRET=${INSTANCE_SECRET}
+
       - APPLICATION_MAX_CONCURRENT_MUTATIONS=${APPLICATION_MAX_CONCURRENT_MUTATIONS:-16}
       - APPLICATION_MAX_CONCURRENT_NODE_ACTIONS=${APPLICATION_MAX_CONCURRENT_NODE_ACTIONS:-16}
       - APPLICATION_MAX_CONCURRENT_QUERIES=${APPLICATION_MAX_CONCURRENT_QUERIES:-16}
       - APPLICATION_MAX_CONCURRENT_V8_ACTIONS=${APPLICATION_MAX_CONCURRENT_V8_ACTIONS:-16}
+
       - RUST_LOG=${RUST_LOG:-info}
       - RUST_BACKTRACE=${RUST_BACKTRACE:-0}
       - DO_NOT_REQUIRE_SSL=${DO_NOT_REQUIRE_SSL:-true}
@@ -29,9 +37,11 @@ services:
       - ACTIONS_USER_TIMEOUT_SECS=${ACTIONS_USER_TIMEOUT_SECS:-300}
       - HTTP_SERVER_TIMEOUT_SECONDS=${HTTP_SERVER_TIMEOUT_SECONDS:-300}
       - REDACT_LOGS_TO_CLIENT=${REDACT_LOGS_TO_CLIENT:-false}
+
       - DATABASE_URL=${DATABASE_URL:-}
       - POSTGRES_URL=${POSTGRES_URL:-}
       - MYSQL_URL=${MYSQL_URL:-}
+
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
@@ -45,15 +55,15 @@ services:
       - AWS_S3_DISABLE_CHECKSUMS=${AWS_S3_DISABLE_CHECKSUMS:-}
       - AWS_S3_DISABLE_SSE=${AWS_S3_DISABLE_SSE:-}
       - AWS_S3_FORCE_PATH_STYLE=${AWS_S3_FORCE_PATH_STYLE:-}
+
       - CONVEX_RELEASE_VERSION_DEV=${CONVEX_RELEASE_VERSION_DEV:-}
+
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3210/version || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 20
       start_period: 120s
-    labels:
-      - "coolify.managed=true"
 
   dashboard:
     image: ghcr.io/get-convex/convex-dashboard:latest
@@ -61,12 +71,17 @@ services:
     stop_grace_period: 10s
     stop_signal: SIGINT
     environment:
-      # ✅ Debe apuntar a la misma URL que CONVEX_CLOUD_ORIGIN
-      - NEXT_PUBLIC_DEPLOYMENT_URL=${CONVEX_CLOUD_ORIGIN}
+      - SERVICE_URL_DASHBOARD_6791
+
+      # El dashboard se conecta al backend API, no al site
+      - NEXT_PUBLIC_DEPLOYMENT_URL=${SERVICE_URL_BACKEND}
+
       - NEXT_PUBLIC_LOAD_MONACO_INTERNALLY=${NEXT_PUBLIC_LOAD_MONACO_INTERNALLY:-false}
+
     depends_on:
       backend:
         condition: service_healthy
+
     healthcheck:
       test:
         [
@@ -77,8 +92,6 @@ services:
       timeout: 10s
       retries: 20
       start_period: 30s
-    labels:
-      - "coolify.managed=true"
 
 volumes:
   convex-data:

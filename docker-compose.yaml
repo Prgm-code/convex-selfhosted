@@ -1,9 +1,3 @@
-# Docker Compose genérico para Coolify - self-hosted Convex
-# Variables requeridas en Coolify:
-#   CONVEX_CLOUD_ORIGIN  → URL pública del puerto 3210 (backend/API)
-#   CONVEX_SITE_ORIGIN   → URL pública del puerto 3211 (HTTP actions)
-#   SERVICE_HEX_32_SECRET → Generado automáticamente por Coolify
-
 services:
   backend:
     image: ghcr.io/get-convex/convex-backend:latest
@@ -11,8 +5,8 @@ services:
     stop_grace_period: 10s
     stop_signal: SIGINT
     ports:
-      - "${BACKEND_HOST_PORT:-3210}:3210"
-      - "${SITE_PROXY_HOST_PORT:-3211}:3211"
+      - "127.0.0.1:${BACKEND_HOST_PORT:-3210}:3210"
+      - "127.0.0.1:${SITE_PROXY_HOST_PORT:-3211}:3211"
     volumes:
       - convex-data:/convex/data
     environment:
@@ -21,11 +15,9 @@ services:
       - APPLICATION_MAX_CONCURRENT_QUERIES=${APPLICATION_MAX_CONCURRENT_QUERIES:-16}
       - APPLICATION_MAX_CONCURRENT_V8_ACTIONS=${APPLICATION_MAX_CONCURRENT_V8_ACTIONS:-16}
       - INSTANCE_NAME=${INSTANCE_NAME:-convex-instance}
-      # ✅ CORREGIDO: usa SERVICE_HEX_32_SECRET generado por Coolify
       - INSTANCE_SECRET=${SERVICE_HEX_32_SECRET}
-      # ✅ CORREGIDO: sin sustitución anidada
-      - CONVEX_CLOUD_ORIGIN=${CONVEX_CLOUD_ORIGIN:-http://127.0.0.1:3210}
-      - CONVEX_SITE_ORIGIN=${CONVEX_SITE_ORIGIN:-http://127.0.0.1:3211}
+      - CONVEX_CLOUD_ORIGIN=${CONVEX_CLOUD_ORIGIN:-http://127.0.0.1:${BACKEND_HOST_PORT:-3210}}
+      - CONVEX_SITE_ORIGIN=${CONVEX_SITE_ORIGIN:-http://127.0.0.1:${SITE_PROXY_HOST_PORT:-3211}}
       - RUST_LOG=${RUST_LOG:-info}
       - RUST_BACKTRACE=${RUST_BACKTRACE:-0}
       - DO_NOT_REQUIRE_SSL=${DO_NOT_REQUIRE_SSL:-true}
@@ -53,13 +45,11 @@ services:
       - AWS_S3_FORCE_PATH_STYLE=${AWS_S3_FORCE_PATH_STYLE:-}
       - CONVEX_RELEASE_VERSION_DEV=${CONVEX_RELEASE_VERSION_DEV:-}
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:3210/version || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3210/version || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 20
       start_period: 120s
-    labels:
-      - "coolify.managed=true"
 
   dashboard:
     image: ghcr.io/get-convex/convex-dashboard:latest
@@ -67,10 +57,9 @@ services:
     stop_grace_period: 10s
     stop_signal: SIGINT
     ports:
-      - "${DASHBOARD_HOST_PORT:-6791}:6791"
+      - "127.0.0.1:${DASHBOARD_HOST_PORT:-6791}:6791"
     environment:
-      # ✅ CORREGIDO: sin sustitución anidada
-      - NEXT_PUBLIC_DEPLOYMENT_URL=${NEXT_PUBLIC_DEPLOYMENT_URL:-http://127.0.0.1:3210}
+      - NEXT_PUBLIC_DEPLOYMENT_URL=${CONVEX_CLOUD_ORIGIN:-http://127.0.0.1:${BACKEND_HOST_PORT:-3210}}
       - NEXT_PUBLIC_LOAD_MONACO_INTERNALLY=${NEXT_PUBLIC_LOAD_MONACO_INTERNALLY:-false}
     depends_on:
       backend:
@@ -85,8 +74,6 @@ services:
       timeout: 10s
       retries: 20
       start_period: 30s
-    labels:
-      - "coolify.managed=true"
 
 volumes:
   convex-data:
