@@ -4,15 +4,24 @@ services:
     restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGINT
+
     ports:
       - "${BACKEND_HOST_PORT:-3210}:3210"
       - "${SITE_PROXY_HOST_PORT:-3211}:3211"
+
     volumes:
       - convex-data:/convex/data
+
     environment:
+      # Variables visibles/editables en Coolify para cambiar puertos locales
+      - BACKEND_HOST_PORT=${BACKEND_HOST_PORT:-3210}
+      - SITE_PROXY_HOST_PORT=${SITE_PROXY_HOST_PORT:-3211}
+
+      # URLs públicas/proxy generadas por Coolify
       - SERVICE_URL_BACKEND_3210
       - SERVICE_URL_SITE_3211
 
+      # Convex backend
       - APPLICATION_MAX_CONCURRENT_MUTATIONS=${APPLICATION_MAX_CONCURRENT_MUTATIONS:-16}
       - APPLICATION_MAX_CONCURRENT_NODE_ACTIONS=${APPLICATION_MAX_CONCURRENT_NODE_ACTIONS:-16}
       - APPLICATION_MAX_CONCURRENT_QUERIES=${APPLICATION_MAX_CONCURRENT_QUERIES:-16}
@@ -21,6 +30,7 @@ services:
       - INSTANCE_NAME=${INSTANCE_NAME:-convex-instance}
       - INSTANCE_SECRET=${SERVICE_HEX_32_SECRET}
 
+      # Usar URLs generadas por Coolify para el proxy público
       - CONVEX_CLOUD_ORIGIN=${SERVICE_URL_BACKEND}
       - CONVEX_SITE_ORIGIN=${SERVICE_URL_SITE}
 
@@ -51,6 +61,7 @@ services:
       - AWS_S3_DISABLE_CHECKSUMS=${AWS_S3_DISABLE_CHECKSUMS:-}
       - AWS_S3_DISABLE_SSE=${AWS_S3_DISABLE_SSE:-}
       - AWS_S3_FORCE_PATH_STYLE=${AWS_S3_FORCE_PATH_STYLE:-}
+
       - CONVEX_RELEASE_VERSION_DEV=${CONVEX_RELEASE_VERSION_DEV:-}
 
     healthcheck:
@@ -65,15 +76,26 @@ services:
     restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGINT
+
     ports:
       - "${DASHBOARD_HOST_PORT:-6791}:6791"
+
     environment:
+      # Variable visible/editable en Coolify para cambiar puerto local del dashboard
+      - DASHBOARD_HOST_PORT=${DASHBOARD_HOST_PORT:-6791}
+
+      # URL pública/proxy generada por Coolify
       - SERVICE_URL_DASHBOARD_6791
+
+      # El dashboard debe apuntar al backend/API 3210
       - NEXT_PUBLIC_DEPLOYMENT_URL=${SERVICE_URL_BACKEND}
+
       - NEXT_PUBLIC_LOAD_MONACO_INTERNALLY=${NEXT_PUBLIC_LOAD_MONACO_INTERNALLY:-false}
+
     depends_on:
       backend:
         condition: service_healthy
+
     healthcheck:
       test:
         [
