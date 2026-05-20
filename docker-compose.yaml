@@ -17,7 +17,8 @@ services:
       - BACKEND_HOST_PORT=${BACKEND_HOST_PORT:-3210}
       - SITE_PROXY_HOST_PORT=${SITE_PROXY_HOST_PORT:-3211}
 
-      # URLs públicas/proxy generadas por Coolify
+      # URLs públicas/proxy generadas por Coolify. No las uses para
+      # CONVEX_CLOUD_ORIGIN: Coolify puede generarlas sin puerto.
       - SERVICE_URL_BACKEND_3210
       - SERVICE_URL_SITE_3211
 
@@ -30,9 +31,11 @@ services:
       - INSTANCE_NAME=${INSTANCE_NAME:-convex-instance}
       - INSTANCE_SECRET=${SERVICE_HEX_32_SECRET}
 
-      # Usar URLs generadas por Coolify para el proxy público
-      - CONVEX_CLOUD_ORIGIN=${SERVICE_URL_BACKEND}
-      - CONVEX_SITE_ORIGIN=${SERVICE_URL_SITE}
+      # URLs internas que usa el backend Convex para llamarse a sí mismo.
+      # Deben apuntar al puerto dentro del mismo contenedor, no a la URL
+      # pública de Coolify, para evitar que Coolify las sobreescriba sin puerto.
+      - CONVEX_CLOUD_ORIGIN=${CONVEX_CLOUD_ORIGIN:-http://127.0.0.1:3210}
+      - CONVEX_SITE_ORIGIN=${CONVEX_SITE_ORIGIN:-http://127.0.0.1:3211}
 
       - RUST_LOG=${RUST_LOG:-info}
       - RUST_BACKTRACE=${RUST_BACKTRACE:-0}
@@ -87,8 +90,9 @@ services:
       # URL pública/proxy generada por Coolify
       - SERVICE_URL_DASHBOARD_6791
 
-      # El dashboard debe apuntar al backend/API 3210
-      - NEXT_PUBLIC_DEPLOYMENT_URL=${SERVICE_URL_BACKEND}
+      # URL pública que usa el navegador para hablar con Convex API.
+      # Configura PUBLIC_BACKEND_URL en Coolify si expones otro host/puerto.
+      - NEXT_PUBLIC_DEPLOYMENT_URL=${PUBLIC_BACKEND_URL:-http://localhost:3210}
 
       - NEXT_PUBLIC_LOAD_MONACO_INTERNALLY=${NEXT_PUBLIC_LOAD_MONACO_INTERNALLY:-false}
 
@@ -100,7 +104,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://127.0.0.1:6791/ >/dev/null 2>&1 || exit 1",
+          "curl -sf http://127.0.0.1:6791/ >/dev/null 2>&1 || exit 1",
         ]
       interval: 30s
       timeout: 10s
