@@ -2,7 +2,7 @@
 
 Este repositorio contiene dos modos de despliegue:
 
-- **Coolify**: usando `docker-compose.yaml` en la raíz.
+- **Coolify**: usando `docker-compose.coolify.yaml` en la raíz.
 - **PC local**: usando `local-docker/docker-compose.yml`.
 
 ## Estructura
