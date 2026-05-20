@@ -1,6 +1,11 @@
 # Despliegue de Convex Self-Hosted en Coolify
 
-Esta guía te ayudará a desplegar Convex Self-Hosted en Coolify usando Docker Compose.
+Esta guia te ayudara a desplegar Convex Self-Hosted en Coolify usando Docker Compose.
+
+Hay dos variantes en la raiz del repositorio:
+
+- `docker-compose.coolify.yaml`: recomendada para Coolify con Traefik/proxy, sin publicar puertos en el host.
+- `docker-compose.yaml`: alternativa para Coolify o Docker cuando tambien quieres publicar puertos locales (`3210`, `3211`, `6791` por defecto).
 
 ## Requisitos Previos
 
@@ -22,10 +27,11 @@ Esta guía te ayudará a desplegar Convex Self-Hosted en Coolify usando Docker C
 **Opción A: Desde GitHub**
 - URL del repositorio: `https://github.com/tu-usuario/convex-selfhosted`
 - Branch: `main`
-- Compose file: `docker-compose.yaml`
+- Compose file recomendado: `docker-compose.coolify.yaml`
+- Compose file alternativo con puertos publicados: `docker-compose.yaml`
 
 **Opción B: Compose Manual**
-- Copia el contenido de `docker-compose.yaml` directamente en Coolify
+- Copia el contenido de `docker-compose.coolify.yaml` directamente en Coolify
 
 ### 3. Configurar Variables de Entorno
 
@@ -41,10 +47,13 @@ INSTANCE_NAME=convex-instance
 # Ejecuta: openssl rand -hex 32
 INSTANCE_SECRET=tu-secret-seguro-aqui
 
-# URLs con tu dominio de Coolify
-CONVEX_CLOUD_ORIGIN=https://convex-backend.tudominio.com
-CONVEX_SITE_ORIGIN=https://convex-site.tudominio.com
-NEXT_PUBLIC_DEPLOYMENT_URL=https://convex-backend.tudominio.com
+# Si usas docker-compose.coolify.yaml, Coolify debe generar:
+# SERVICE_URL_BACKEND y SERVICE_URL_SITE.
+#
+# Si usas docker-compose.yaml con puertos publicados, puedes configurar:
+# CONVEX_CLOUD_ORIGIN=https://convex-backend.tudominio.com
+# CONVEX_SITE_ORIGIN=https://convex-site.tudominio.com
+# PUBLIC_BACKEND_URL=https://convex-backend.tudominio.com
 ```
 
 #### Variables Recomendadas
@@ -65,6 +74,8 @@ Para cada servicio, configura un dominio:
 | backend | 3210 | convex-api.tudominio.com |
 | backend (site) | 3211 | convex-site.tudominio.com |
 | dashboard | 6791 | convex-dashboard.tudominio.com |
+
+Con `docker-compose.coolify.yaml`, no agregues `ports:` manualmente: Coolify/Traefik debe publicar esos servicios mediante dominios. Con `docker-compose.yaml`, los puertos tambien quedan publicados en el host y puedes cambiarlos con `BACKEND_HOST_PORT`, `SITE_PROXY_HOST_PORT` y `DASHBOARD_HOST_PORT`.
 
 En Coolify:
 1. Ve a la configuración del servicio
@@ -219,9 +230,11 @@ Para actualizar a una nueva versión:
 |----------|-----------|-------------|-------------------|
 | `INSTANCE_NAME` | Sí | Nombre de tu instancia | `convex-instance` |
 | `INSTANCE_SECRET` | Sí | Secret para autenticación | - |
-| `CONVEX_CLOUD_ORIGIN` | Sí | URL pública del backend | - |
-| `CONVEX_SITE_ORIGIN` | Sí | URL del site proxy | - |
-| `NEXT_PUBLIC_DEPLOYMENT_URL` | Sí | URL para el dashboard | - |
+| `SERVICE_URL_BACKEND` | Segun compose | URL publica del backend generada por Coolify | - |
+| `SERVICE_URL_SITE` | Segun compose | URL publica del site generada por Coolify | - |
+| `CONVEX_CLOUD_ORIGIN` | Segun compose | URL publica del backend | - |
+| `CONVEX_SITE_ORIGIN` | Segun compose | URL del site proxy | - |
+| `PUBLIC_BACKEND_URL` | No | URL del backend para `docker-compose.yaml` | `http://localhost:3210` |
 | `RUST_LOG` | No | Nivel de logging | `info` |
 | `DO_NOT_REQUIRE_SSL` | No | Deshabilitar SSL requerido | `true` |
 | `DISABLE_BEACON` | No | Deshabilitar telemetría | `true` |
