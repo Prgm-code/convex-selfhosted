@@ -1,0 +1,230 @@
+# Convex self-hosted para Coolify con PostgreSQL y MinIO integrados.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-convex}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_POSTGRES}
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d postgres
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  database-init:
+    image: postgres:17-alpine
+    restart: "no"
+    exclude_from_hc: true
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:-convex}
+      PGPASSWORD: ${SERVICE_PASSWORD_64_POSTGRES}
+      INSTANCE_NAME: ${INSTANCE_NAME:-convex-instance}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        case "$$INSTANCE_NAME" in
+          ""|[!A-Za-z0-9]*|*[!A-Za-z0-9_-]*)
+            echo "INSTANCE_NAME solo puede contener letras, números, guiones y guiones bajos."
+            exit 1
+            ;;
+        esac
+
+        DB_NAME=$$(printf '%s' "$$INSTANCE_NAME" | tr '-' '_')
+
+        if [ "$${#DB_NAME}" -gt 63 ]; then
+          echo "El nombre normalizado de la base supera los 63 caracteres."
+          exit 1
+        fi
+
+        echo "Comprobando base de datos: $$DB_NAME"
+
+        psql \
+          --dbname=postgres \
+          --set=ON_ERROR_STOP=1 \
+          --set=db_name="$$DB_NAME" <<'SQL'
+        SELECT format('CREATE DATABASE %I', :'db_name')
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM pg_database
+          WHERE datname = :'db_name'
+        )
+        \gexec
+        SQL
+
+        echo "Base de datos $$DB_NAME preparada correctamente."
+
+  minio:
+    image: quay.io/minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      - SERVICE_URL_MINIO_9001
+      - MINIO_BROWSER_REDIRECT_URL=${MINIO_BROWSER_REDIRECT_URL:-${SERVICE_URL_MINIO_9001}}
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO_ROOT}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_64_MINIO_ROOT}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -f http://127.0.0.1:9000/minio/health/live || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  minio-init:
+    image: quay.io/minio/mc:latest
+    restart: "no"
+    exclude_from_hc: true
+    entrypoint: /bin/sh
+    environment:
+      MINIO_ROOT_USER: ${SERVICE_USER_MINIO_ROOT}
+      MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_64_MINIO_ROOT}
+      MINIO_APP_USER: ${SERVICE_USER_MINIO_APP}
+      MINIO_APP_PASSWORD: ${SERVICE_PASSWORD_64_MINIO_APP}
+      S3_STORAGE_FILES_BUCKET: ${S3_STORAGE_FILES_BUCKET:-convex-user-files}
+      S3_STORAGE_MODULES_BUCKET: ${S3_STORAGE_MODULES_BUCKET:-convex-modules}
+      S3_STORAGE_SEARCH_BUCKET: ${S3_STORAGE_SEARCH_BUCKET:-convex-search-indexes}
+      S3_STORAGE_EXPORTS_BUCKET: ${S3_STORAGE_EXPORTS_BUCKET:-convex-snapshot-exports}
+      S3_STORAGE_SNAPSHOT_IMPORTS_BUCKET: ${S3_STORAGE_SNAPSHOT_IMPORTS_BUCKET:-convex-snapshot-imports}
+    depends_on:
+      minio:
+        condition: service_healthy
+    command:
+      - -ec
+      - |
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+
+        mc admin user add local "$$MINIO_APP_USER" "$$MINIO_APP_PASSWORD"
+        mc admin policy attach local readwrite --user "$$MINIO_APP_USER"
+
+        for bucket in \
+          "$$S3_STORAGE_FILES_BUCKET" \
+          "$$S3_STORAGE_MODULES_BUCKET" \
+          "$$S3_STORAGE_SEARCH_BUCKET" \
+          "$$S3_STORAGE_EXPORTS_BUCKET" \
+          "$$S3_STORAGE_SNAPSHOT_IMPORTS_BUCKET"
+        do
+          mc mb --ignore-existing "local/$$bucket"
+        done
+
+        echo "Buckets de MinIO preparados correctamente."
+
+  backend:
+    image: ghcr.io/get-convex/convex-backend:latest
+    restart: unless-stopped
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    volumes:
+      - convex-data:/convex/data
+    environment:
+      - SERVICE_URL_BACKEND_3210
+      - SERVICE_URL_BACKEND_3211
+
+      # Backend API / puerto 3210
+      - CONVEX_CLOUD_ORIGIN=${CONVEX_CLOUD_ORIGIN:-${SERVICE_URL_BACKEND_3210}}
+
+      # HTTP actions / site / puerto 3211
+      - CONVEX_SITE_ORIGIN=${CONVEX_SITE_ORIGIN:-${SERVICE_URL_BACKEND_3211}}
+
+      - INSTANCE_NAME=${INSTANCE_NAME:-convex-instance}
+      - INSTANCE_SECRET=${SERVICE_HEX_64_SECRET}
+
+      # PostgreSQL interno
+      - POSTGRES_URL=postgresql://${POSTGRES_USER:-convex}:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432
+
+      # MinIO interno compatible con la API S3
+      - AWS_ACCESS_KEY_ID=${SERVICE_USER_MINIO_APP}
+      - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_64_MINIO_APP}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - S3_ENDPOINT_URL=http://minio:9000
+      - S3_STORAGE_FILES_BUCKET=${S3_STORAGE_FILES_BUCKET:-convex-user-files}
+      - S3_STORAGE_MODULES_BUCKET=${S3_STORAGE_MODULES_BUCKET:-convex-modules}
+      - S3_STORAGE_SEARCH_BUCKET=${S3_STORAGE_SEARCH_BUCKET:-convex-search-indexes}
+      - S3_STORAGE_EXPORTS_BUCKET=${S3_STORAGE_EXPORTS_BUCKET:-convex-snapshot-exports}
+      - S3_STORAGE_SNAPSHOT_IMPORTS_BUCKET=${S3_STORAGE_SNAPSHOT_IMPORTS_BUCKET:-convex-snapshot-imports}
+      - AWS_S3_FORCE_PATH_STYLE=${AWS_S3_FORCE_PATH_STYLE:-true}
+      - AWS_S3_DISABLE_CHECKSUMS=${AWS_S3_DISABLE_CHECKSUMS:-true}
+      - AWS_S3_DISABLE_SSE=${AWS_S3_DISABLE_SSE:-true}
+
+      - APPLICATION_MAX_CONCURRENT_MUTATIONS=${APPLICATION_MAX_CONCURRENT_MUTATIONS:-16}
+      - APPLICATION_MAX_CONCURRENT_NODE_ACTIONS=${APPLICATION_MAX_CONCURRENT_NODE_ACTIONS:-16}
+      - APPLICATION_MAX_CONCURRENT_QUERIES=${APPLICATION_MAX_CONCURRENT_QUERIES:-16}
+      - APPLICATION_MAX_CONCURRENT_V8_ACTIONS=${APPLICATION_MAX_CONCURRENT_V8_ACTIONS:-16}
+
+      - RUST_LOG=${RUST_LOG:-info}
+      - RUST_BACKTRACE=${RUST_BACKTRACE:-0}
+      - DO_NOT_REQUIRE_SSL=${DO_NOT_REQUIRE_SSL:-true}
+      - DISABLE_BEACON=${DISABLE_BEACON:-true}
+      - DISABLE_METRICS_ENDPOINT=${DISABLE_METRICS_ENDPOINT:-true}
+      - DOCUMENT_RETENTION_DELAY=${DOCUMENT_RETENTION_DELAY:-172800}
+      - ACTIONS_USER_TIMEOUT_SECS=${ACTIONS_USER_TIMEOUT_SECS:-300}
+      - HTTP_SERVER_TIMEOUT_SECONDS=${HTTP_SERVER_TIMEOUT_SECONDS:-300}
+      - REDACT_LOGS_TO_CLIENT=${REDACT_LOGS_TO_CLIENT:-false}
+
+      - CONVEX_RELEASE_VERSION_DEV=${CONVEX_RELEASE_VERSION_DEV:-}
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      database-init:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -sf http://127.0.0.1:3210/version || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+
+  dashboard:
+    image: ghcr.io/get-convex/convex-dashboard:latest
+    restart: unless-stopped
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    environment:
+      - SERVICE_URL_DASHBOARD_6791
+      - SERVICE_URL_BACKEND_3210
+
+      # El dashboard se conecta al backend API, no al site
+      - NEXT_PUBLIC_DEPLOYMENT_URL=${NEXT_PUBLIC_DEPLOYMENT_URL:-${SERVICE_URL_BACKEND_3210}}
+
+      - NEXT_PUBLIC_LOAD_MONACO_INTERNALLY=${NEXT_PUBLIC_LOAD_MONACO_INTERNALLY:-false}
+
+    depends_on:
+      backend:
+        condition: service_started
+
+volumes:
+  convex-data:
+    name: ${CONVEX_DATA_VOLUME:-convex-data}
+    driver: local
+
+  postgres-data:
+    name: ${POSTGRES_DATA_VOLUME:-convex-postgres-data}
+    driver: local
+
+  minio-data:
+    name: ${MINIO_DATA_VOLUME:-convex-minio-data}
+    driver: local
