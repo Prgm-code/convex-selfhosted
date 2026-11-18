@@ -246,4 +246,4 @@ Para actualizar a una nueva versión:
 
 - [Documentación de Convex](https://docs.convex.dev/)
 - [Documentación de Coolify](https://coolify.io/docs/)
-- [GitHub de Convex Backend](https://github.com/get-convex/convex-backend)
+- [GitHub de Convex Backend](https://github.com/convex/convex-backend)

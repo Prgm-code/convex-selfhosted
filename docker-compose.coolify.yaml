@@ -4,8 +4,7 @@
 
 services:
   backend:
-    image: ghcr.io/get-convex/convex-backend:latest
-    pull_policy: never
+    image: ghcr.io/convex/convex-backend:latest
     restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGINT
@@ -67,8 +66,7 @@ services:
       start_period: 120s
 
   dashboard:
-    image: ghcr.io/get-convex/convex-dashboard:latest
-    pull_policy: never
+    image: ghcr.io/convex/convex-dashboard:latest
     restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGINT
