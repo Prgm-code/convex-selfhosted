@@ -1,6 +1,6 @@
 # Dockerfile para despliegue en Dokku
 # Usa la imagen oficial de Convex Backend
-FROM ghcr.io/get-convex/convex-backend:latest
+FROM ghcr.io/convex/convex-backend:latest
 
 # El directorio de datos se montará como volumen persistente
 VOLUME ["/convex/data"]
